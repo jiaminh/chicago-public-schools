@@ -1,0 +1,1359 @@
+---
+title: "Final report"
+author: Jiamin
+date: 2019-03-15
+output: 
+  github_document:
+    toc: true
+---
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+library(tidyverse)
+library(sf)
+library(gganimate)
+library(gifski)
+library(cowplot)
+
+# CPS Elementary School Performance, yearly
+year_11 <- "~/Documents/Junior/ENGR 150/cps_elem_2011.csv"
+year_12 <- "~/Documents/Junior/ENGR 150/cps_elem_2012.csv"
+year_13 <- "~/Documents/Junior/ENGR 150/cps_elem_2013.csv"
+year_14 <- "~/Documents/Junior/ENGR 150/cps_elem_2014.csv"
+year_15 <- "~/Documents/Junior/ENGR 150/cps_elem_2015.csv"
+year_16 <- "~/Documents/Junior/ENGR 150/cps_elem_2016.csv"
+year_17 <- "~/Documents/Junior/ENGR 150/cps_elem_2017.csv"
+year_18 <- "~/Documents/Junior/ENGR 150/cps_elem_2018.csv"
+
+# School-level free/reduced lunch percentage
+frl_17 <- "~/Documents/Junior/ENGR 150/cps_frl_17.csv"
+frl_11 <- "~/Documents/Junior/ENGR 150/cps_frl_11.csv"
+
+#School-level racial demographics
+race_17 <- "~/Documents/Junior/ENGR 150/cps_race_17.csv"
+race_11 <- "~/Documents/Junior/ENGR 150/cps_race_11.csv"
+
+# School-level attainment/growth
+attain_file <- "~/Documents/Junior/ENGR 150/cps_attain_13_17.csv"
+growth_file <- "~/Documents/Junior/ENGR 150/cps_growth_13_17.csv"
+
+# Elementary attendance shapefiles
+network_shapes <- "~/Documents/Junior/ENGR 150/Chicago Public Schools - Geographic Networks.geojson"
+school_locations_file <- "~/Documents/Junior/ENGR 150/Chicago Public Schools - School Locations SY1112.geojson"
+
+elem_boundaries_1718 <- 
+  "~/Documents/Junior/ENGR 150/Chicago Public Schools - Elementary School Attendance Boundaries SY1718 (1).geojson"
+
+elem_boundaries_1415 <- 
+  "~/Documents/Junior/ENGR 150/Chicago Public Schools - Elementary School Attendance Boundaries SY1415.geojson"
+
+NYT_NA_COLOR <- "#f2f2f2"
+
+# IDs of schools I was not able to independently confirm had closed
+UNCERTAIN_IDS <- c(400108, 400067, 610308, 609774, 610515, 610101)
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+cps_11 <-
+  year_11 %>% 
+  read_csv(
+    col_types = 
+      cols_only(
+        `School ID` = col_integer(),
+        Unit = col_integer(),
+        `School Name` = col_character(),
+        Network = col_character(),
+        `2011-2012 Probation Status` = col_character(),
+        `2010-2011 Level` = col_character()
+      ),
+    skip = 1
+  ) %>% 
+  rename(
+    school_id = `School ID`,
+    name = `School Name`,
+    network = Network,
+    rating_2011 = `2010-2011 Level`,
+    status_2011 = `2011-2012 Probation Status`
+  )
+```
+
+```{r, message=FALSE, warning=FALSE}
+cps_12 <-
+  year_12 %>% 
+  read_csv(
+    col_types = 
+      cols_only(
+        `School ID` = col_integer(),
+        Unit = col_integer(),
+        `School Name` = col_character(),
+        Network = col_character(),
+        `2012-2013 Probation Status` = col_character(),
+        `2011-2012 Level` = col_character()
+      ),
+    skip = 1
+  ) %>% 
+  rename(
+    school_id = `School ID`,
+    name = `School Name`,
+    network = Network,
+    rating_2012 = `2011-2012 Level`,
+    status_2012 = `2012-2013 Probation Status`
+  ) 
+```
+
+```{r, message=FALSE, warning=FALSE}
+cps_13 <-
+  year_13 %>% 
+  read_csv(
+    col_types = 
+      cols_only(
+        `School ID` = col_integer(),
+        Unit = col_integer(),
+        `School Name` = col_character(),
+        Network = col_character(),
+        `2013-2014 Probation Status` = col_character(),
+        `2012-2013 Level` = col_character()
+      ),
+    skip = 1
+  ) %>% 
+  rename(
+    school_id = `School ID`,
+    name = `School Name`,
+    network = Network,
+    rating_2013 = `2012-2013 Level`,
+    status_2013 = `2013-2014 Probation Status`
+  )
+```
+
+```{r, message=FALSE, warning=FALSE}
+cps_14 <-
+  year_14 %>% 
+  read_csv(
+    col_types = 
+      cols_only(
+        `School ID` = col_integer(),
+        `School Name` = col_character(),
+        Network = col_character(),
+        `SY 2014-2015 SQRP Rating` = col_character(),
+        `SY 2014-2015 Accountability Status` = col_character()
+      ),
+    skip = 3
+  ) %>% 
+  rename(
+    school_id = `School ID`,
+    name = `School Name`,
+    network = Network,
+    rating_2014 = `SY 2014-2015 SQRP Rating`,
+    status_2014 = `SY 2014-2015 Accountability Status`
+  )
+
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+cps_15 <-
+  year_15 %>% 
+  read_csv(
+    col_types = 
+      cols_only(
+        `School ID` = col_integer(),
+        `School Name` = col_character(),
+        Network = col_character(),
+        `SY 2015-2016 SQRP Rating` = col_character(),
+        `SY 2015-2016 Accountability Status` = col_character()
+      ),
+    skip = 3
+  ) %>% 
+  rename(
+    school_id = `School ID`,
+    name = `School Name`,
+    network = Network,
+    rating_2015 = `SY 2015-2016 SQRP Rating`,
+    status_2015 = `SY 2015-2016 Accountability Status`
+  )
+```
+
+```{r, message=FALSE, warning=FALSE}
+cps_16 <-
+  year_16 %>% 
+  read_csv(
+    col_types = 
+      cols_only(
+        `School ID` = col_integer(),
+        `School Name` = col_character(),
+        Network = col_character(),
+        `SY 2016-2017 SQRP Rating` = col_character(),
+        `SY 2016-2017 Accountability Status` = col_character()
+      ),
+    skip = 2
+  ) %>% 
+  rename(
+    school_id = `School ID`,
+    name = `School Name`,
+    network = Network,
+    rating_2016 = `SY 2016-2017 SQRP Rating`,
+    status_2016 = `SY 2016-2017 Accountability Status`
+  )
+```
+
+```{r, message=FALSE, warning=FALSE}
+cps_17 <-
+  year_17 %>% 
+  read_csv(
+    col_types = 
+      cols_only(
+        `School ID` = col_integer(),
+        `School Name` = col_character(),
+        Network = col_character(),
+        `SY 2017-2018 SQRP Rating` = col_character(),
+        `SY 2017-2018 Accountability Status` = col_character()
+      ),
+    skip = 2
+  ) %>% 
+  rename(
+    school_id = `School ID`,
+    name = `School Name`,
+    network = Network,
+    rating_2017 = `SY 2017-2018 SQRP Rating`,
+    status_2017 = `SY 2017-2018 Accountability Status`
+  )
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+df_11_17 <-
+  cps_17 %>% 
+  left_join(
+    cps_16 %>% 
+      select(school_id, rating_2016, status_2016), 
+    by = "school_id"
+  ) %>% 
+  left_join(
+    cps_15 %>% 
+      select(school_id, rating_2015, status_2015), 
+    by = "school_id"
+  ) %>% 
+  left_join(
+    cps_14 %>% 
+      select(school_id, rating_2014, status_2014), 
+    by = "school_id"
+  ) %>% 
+  left_join(
+    cps_13 %>% 
+      select(school_id, rating_2013, status_2013), 
+    by = "school_id"
+  ) %>%
+  left_join(
+    cps_12 %>% 
+      select(school_id, rating_2012, status_2012), 
+    by = "school_id"
+  ) %>%
+  left_join(
+    cps_11 %>% 
+      select(school_id, rating_2011, status_2011), 
+    by = "school_id"
+  )
+
+df_11_17 <-
+  df_11_17 %>% 
+  gather(key = key, value = value, rating_2017:status_2011) %>% 
+  separate(key, into = c("key", "year"), sep = "_", convert = TRUE) %>% 
+  spread(key = key, value = value) %>%
+  mutate(
+    rating =
+      if_else(
+        rating %in% c("Inability to Rate", "Not Enough Data"), 
+        NA_character_, 
+        rating
+      ),
+    rating = str_remove(rating, "\\+$"),
+    status = 
+      recode(
+        status,
+        "Not Applicable" = NA_character_,
+        "Good Standing" = "Not on Probation",
+        "Intensive Support" = "Probation",
+        "Provisional Support" = "Probation"
+      ),
+    network =
+      fct_relevel(
+        network,
+        "Network 1",
+        "Network 2",
+        "Network 3",
+        "Network 4",
+        "Network 5",
+        "Network 6",
+        "Network 7",
+        "Network 8",
+        "Network 9",
+        "Network 10",
+        "Network 11",
+        "Network 12",
+        "Network 13",
+        "AUSL",
+        "Charter",
+        "Contract"
+      )
+  )
+```
+
+```{r}
+df_frl_17 <-
+  frl_17 %>% 
+  read_csv(
+    col_names = FALSE,
+    col_types = 
+      cols_only(
+        X1 = col_character(),
+        X2 = col_integer(),
+        X3 = col_character(),
+        X4 = col_character(),
+        X10 = col_character()
+      ),
+    skip = 3
+  ) %>% 
+  transmute(
+    network = X1,
+    school_id = X2,
+    name = X3,
+    total_enroll = as.integer(str_remove(X4, ",")),
+    percent_frl = as.double(str_remove(X10, "%$"))
+  ) %>% 
+  filter(network != "Options")
+
+```
+
+```{r}
+df_race_17 <-
+  race_17 %>% 
+  read_csv(
+    col_names = FALSE,
+    col_types = 
+      cols_only(
+        X1 = col_integer(),
+        X2 = col_character(),
+        X3 = col_character(),
+        X4 = col_character(),
+        X6 = col_double(),
+        X8 = col_double(),
+        X12 = col_double(),
+        X14 = col_double(),
+        X16 = col_double(),
+        X18 = col_double(),
+        X20 = col_double()
+      ),
+    skip = 3
+  ) %>% 
+  transmute(
+    network = X3,
+    school_id = X1,
+    name = X2,
+    total_enroll = as.integer(str_remove(X4, ",")),
+    pct_white = X6,
+    pct_blk = X8,
+    pct_native = X12,
+    pct_hisp = X14,
+    pct_mixed = X16,
+    pct_asian = X18,
+    pct_pi = X20
+  ) %>% 
+  filter(network != "Options")
+```
+
+```{r, warning=FALSE}
+df_race_11 <-
+  race_11 %>% 
+  read_csv(
+    col_names = FALSE,
+    col_types = 
+      cols_only(
+        X2 = col_integer(),
+        X4 = col_character(),
+        X5 = col_integer(),
+        X7 = col_double(),
+        X9 = col_double(),
+        X15 = col_double()
+      ),
+    skip = 2
+  ) %>% 
+  rename(
+    school_id = X2,
+    name = X4,
+    total_enroll = X5,
+    pct_white = X7,
+    pct_blk = X9,
+    pct_hisp = X15
+  ) %>% 
+  drop_na(school_id)
+
+df_frl_11 <-
+  frl_11 %>% 
+  read_csv(
+    col_names = FALSE,
+    col_types = 
+      cols_only(
+        X2 = col_integer(),
+        X4 = col_character(),
+        X5 = col_number(),
+        X11 = col_number()
+      ),
+    skip = 2
+  ) %>% 
+  rename(
+    school_id = X2,
+    name = X4,
+    total_enroll = X5,
+    percent_frl = X11
+  ) %>% 
+  drop_na(school_id)
+
+```
+
+```{r, warning=FALSE}
+attain_df <-
+  attain_file %>% 
+  read_csv(
+    col_names = FALSE,
+    skip = 2
+  ) %>% 
+  transmute(
+    school_id = X1,
+    school_name = X2,
+    network = X3,
+    subject = X4,
+    grade = X5,
+    num_students_13 = X10,
+    avg_score_13 = X11,
+    pct_at_nat_avg_13 = X12,
+    nat_percentil_13 = X13,
+    num_students_14 = X14,
+    avg_score_14 = X15,
+    pct_at_nat_avg_14 = X16,
+    nat_percentil_14 = X17,
+    num_students_15 = X18,
+    avg_score_15 = X19,
+    pct_at_nat_avg_15 = X20,
+    nat_percentil_15 = X21,
+    num_students_16 = X22,
+    avg_score_16 = X23,
+    pct_at_nat_avg_16 = X24,
+    nat_percentil_16 = X25,
+    num_students_17 = X26,
+    avg_score_17 = X27,
+    pct_at_nat_avg_17 = X28,
+    nat_percentil_17 = X29,
+  ) %>% 
+  filter(!str_detect(school_name, " HS$")) %>%
+  distinct(school_id, school_name, network, subject, grade, .keep_all = TRUE) %>% 
+  gather(key = key, value = value, contains("_1")) %>% 
+  separate(key, into = c("left", "year"), sep = "_(?=\\d)") %>%
+  spread(key = left, value = value) %>% 
+  mutate(
+    year = as.integer(year) + 2000L,
+     network =
+      fct_relevel(
+        network,
+        "Network 1",
+        "Network 2",
+        "Network 3",
+        "Network 4",
+        "Network 5",
+        "Network 6",
+        "Network 7",
+        "Network 8",
+        "Network 9",
+        "Network 10",
+        "Network 11",
+        "Network 12",
+        "Network 13",
+        "AUSL",
+        "Charter",
+        "Contract"
+      )
+  )
+```
+
+```{r, warning=FALSE}
+growth_df <-
+  growth_file %>% 
+  read_csv(
+    col_names = FALSE,
+    skip = 2
+  ) %>% 
+  transmute(
+    school_id = X1,
+    school_name = X2,
+    network = X3,
+    subject = X4,
+    grade = X5,
+    num_tested_13 = X6,
+    avg_growth_13 = X9,
+    pct_at_nat_avg_13 = X10,
+    nat_percentil_13 = X11,
+    num_tested_14 = X12,
+    avg_growth_14 = X15,
+    pct_at_nat_avg_14 = X16,
+    nat_percentil_14 = X17,
+    num_tested_15 = X18,
+    avg_growth_15 = X21,
+    pct_at_nat_avg_15 = X22,
+    nat_percentil_15 = X23,
+    num_tested_16 = X24,
+    avg_growth_16 = X27,
+    pct_at_nat_avg_16 = X28,
+    nat_percentil_16 = X29,
+    num_tested_17 = X30,
+    avg_growth_17 = X33,
+    pct_at_nat_avg_17 = X34,
+    nat_percentil_17 = X35
+  ) %>% 
+  filter(!str_detect(school_name, " HS$")) %>%
+  distinct(school_id, school_name, network, subject, grade, .keep_all = TRUE) %>% 
+  gather(key = key, value = value, contains("_1")) %>% 
+  separate(key, into = c("left", "year"), sep = "_(?=\\d)") %>%
+  spread(key = left, value = value) %>% 
+  mutate(
+    year = as.integer(year) + 2000L,
+     network =
+      fct_relevel(
+        network,
+        "Network 1",
+        "Network 2",
+        "Network 3",
+        "Network 4",
+        "Network 5",
+        "Network 6",
+        "Network 7",
+        "Network 8",
+        "Network 9",
+        "Network 10",
+        "Network 11",
+        "Network 12",
+        "Network 13",
+        "AUSL",
+        "Charter",
+        "Contract"
+      )
+  )
+```
+```{r}
+networks <-
+  network_shapes %>% 
+  read_sf()
+  
+school_locations <-
+  school_locations_file %>% 
+  read_sf() 
+```
+
+```{r, warning=FALSE}
+elem_boundaries_17 <-
+elem_boundaries_1718 %>% 
+  read_sf()
+
+elem_boundaries_14 <-
+elem_boundaries_1415 %>% 
+  read_sf()
+```
+
+
+### Introduction and Background
+
+This report investigates the Chicago Public School district under Mayor Rahm Emanuel's term, which began in 2011. I used data publicly available on the [CPS website](https://cps.edu/SchoolData/Pages/SchoolData.aspx), as well as the [City of Chicago data portal](https://data.cityofchicago.org/). 
+
+Mayor Emanuel's term has been filled with intense debate over reforming Chicago public schools, and was marked by events such as the 2012 Chicago Teacher's Union strike, adoption of major reforms such as a 90-minute longer school day, and notably the largest public school closure in history. 
+
+With these massive changes in the CPS district, I wanted to explore the performance of elementary schools during this time, and see how CPS has really fared under Emanuel's term.
+
+(Note: Throughout this report, anytime a single year is mentioned, it is being used to refer to the beginning of the corresponding school year. For example, the year 2017 indicates the 2017-2018 school year.)
+
+### CPS Demographics
+
+First, we have to understand what Chicago Public Schools are like in terms of race and class. All of the plots that follow are made using data from the 2017-18 school year, to see what the state of CPS is today. We'll use the percent of students on free and reduced lunch as a proxy for family income levels. Students qualify for free or reduced lunch if their families make less than 185% of the federal poverty line.
+
+```{r}
+weighted_mean_lunch <-
+  df_frl_17 %>% 
+  summarise(
+    mean = 
+      weighted.mean(percent_frl, w = total_enroll, na.rm = TRUE)
+  ) %>% 
+  pull(mean)
+
+df_frl_17 %>% 
+  drop_na(percent_frl) %>% 
+  ggplot(aes(percent_frl)) +
+  geom_histogram(binwidth = 5, color = "black") +
+  geom_vline(
+    aes(xintercept = weighted_mean_lunch), 
+    color = "red", 
+    size = 2
+  ) +
+  annotate(
+    geom = "text",
+    x = 56,
+    y = 177,
+    hjust = 0,
+    label = "District-wide\npercentage (77%)"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 100, 10), 
+    labels = function(x) str_c(x, "%"), 
+    minor_breaks = NULL
+  ) +
+  scale_y_continuous(breaks = seq(0, 200, 25), minor_breaks = NULL) +
+  labs(
+    title = "Distribution of Percent on Free/Reduced Lunch",
+    x = "Percent on Free/Reduced Lunch",
+    y = "Number of Schools",
+    caption = "Source: CPS"
+  )
+```
+
+We can clearly see that the vast majority of CPS students are low income. Now, let's look at race.
+
+```{r}
+weighted_mean_race <-
+  df_race_17 %>% 
+  summarise(mean = weighted.mean(pct_white, w = total_enroll, na.rm = TRUE)) %>% 
+  pull(mean)
+
+df_race_17 %>% 
+  drop_na(pct_white) %>% 
+  ggplot(aes(pct_white)) +
+  geom_histogram(binwidth = 3, color = "black") +
+  geom_vline(aes(xintercept = weighted_mean_race), color = "red", size = 2) +
+  annotate(
+    geom = "text",
+    x = 12,
+    y = 350,
+    hjust = 0,
+    label = "District-wide\npercentage (10.4%)"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 100, 10), 
+    labels = function(x) str_c(x, "%"), 
+    minor_breaks = NULL
+  ) +
+  scale_y_continuous(breaks = seq(0, 400, 50), minor_breaks = NULL) +
+  labs(
+    title = "Distribution of Percent of White Students",
+    x = "Percent White",
+    y = "Number of Schools",
+    caption = "Source: CPS"
+  )
+
+```
+
+Only 10.4% of CPS students are white. Immediately, we see that CPS serves students that are predominately low-income minorities, a vastly marginalized population. Now we'll investigate where schools on probation fall demographically.
+
+```{r, fig.width=8, fig.height=8}
+df_11_17 %>% 
+  filter(year == 2017) %>% 
+  left_join(
+    df_frl_17 %>% 
+      select(-network, -name), 
+    by = "school_id"
+  ) %>% 
+  left_join(
+    df_race_17 %>% 
+      select(-network, -name, -total_enroll), 
+    by = "school_id"
+  ) %>% 
+  drop_na(status) %>% 
+  mutate(status = fct_relevel(status, "Not on Probation")) %>% 
+  arrange(status, desc(total_enroll)) %>% 
+  ggplot(aes(percent_frl, pct_white)) +
+  geom_point(
+    aes(fill = status, size = total_enroll), 
+    shape = 21, 
+    alpha = 0.7
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 100, 20), 
+    labels = function(x) str_c(x, "%"), 
+    minor_breaks = FALSE
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 100, 20), 
+    labels = function(x) str_c(x, "%"), 
+    minor_breaks = FALSE
+  ) +
+  scale_size_continuous(range = c(1, 5)) +
+  scale_fill_manual(
+    values =
+      c("Not on Probation" = "grey60", "Probation" = "indianred1")
+  ) +
+  coord_fixed() +
+  theme_light() +
+  theme(
+    legend.justification = c(0, 1)
+  ) +
+  labs(
+    title = "Schools by Race and Income (as of the 2017-18 School Year)",
+    x = "Percent on Free/Reduced Lunch",
+    y = "Percent White",
+    size = "Total\nEnrollment",
+    fill = "Probation\nStatus",
+    caption = "Source: CPS"
+  )
+```
+
+Here we see that all of the schools that are on probation as of the 2017-18 school year are in that bottom right corner, where almost all of the kids are low income minorities. (Take note, that bottom right corner's a theme.)
+
+We'll now see how each geographic network (how the district sorts schools administratively - think of them as districts within the district) looks in terms of race, income, and probation status.
+
+```{r, out.width = "100%", fig.width = 10, fig.height = 10}
+df_11_17 %>% 
+  filter(year == 2017) %>% 
+  left_join(
+    df_frl_17 %>% 
+      select(-network, -name), 
+    by = "school_id"
+  ) %>% 
+  left_join(
+    df_race_17 %>% 
+      select(-network, -name, -total_enroll), 
+    by = "school_id"
+  ) %>% 
+  drop_na(status) %>% 
+  mutate(status = fct_relevel(status, "Not on Probation")) %>% 
+  arrange(status, desc(total_enroll)) %>% 
+  ggplot(aes(percent_frl, pct_white)) +
+  geom_point(aes(fill = status, size = total_enroll), shape = 21, alpha = 0.7) +
+  scale_x_continuous(
+    breaks = seq(0, 100, 20), 
+    labels = function(x) str_c(x, "%"), 
+    minor_breaks = FALSE
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 100, 20), 
+    labels = function(x) str_c(x, "%"), 
+    minor_breaks = FALSE
+  ) +
+  scale_size_continuous(range = c(1, 5)) +
+  scale_fill_manual(
+    values =
+      c("Not on Probation" = "grey60", "Probation" = "indianred1")
+  ) +
+  coord_fixed() +
+  facet_wrap(vars(network)) +
+  theme_light() +
+  theme(
+    legend.justification = c(0, 1)
+  ) +
+  labs(
+    title = "Schools by Race and Income (as of the 2017-18 School Year)",
+    x = "Percent on Free/Reduced Lunch",
+    y = "Percent White",
+    size = "Total\nEnrollment",
+    fill = "Probation\nStatus",
+    caption = "Source: CPS"
+  )
+```
+
+Several networks are comprised entirely of schools in the bottom right corner - a sign of how racially- and class-segregated Chicago schools are, even today.
+
+### Probation Rate Over Time
+
+We'll start off with a simple metric and a seemingly simple question - how has the proportion of schools on probation changed since 2011? After all, if they are improving, we should see fewer schools on probation. However, this question is actually not that easy to answer. For one, CPS changed its assessment metrics beginning with the 2014-15 school year, so probation status was conferred on totally different criteria. For another, Rahm Emanuel closed 49 elementary schools after the 2012-2013 school year. These affect how we should interpret the change in probation rate. 
+
+For now though, let's take a naive approach and look at how the proportion of schools on probation has changed from 2011 to 2017, without taking any special considerations.
+
+```{r}
+prob_df <-
+  cps_11 %>% 
+  select(-network) %>% 
+  left_join(
+    cps_12 %>% 
+      select(school_id, rating_2012, status_2012), 
+    by = "school_id"
+  ) %>% 
+  left_join(
+    cps_13 %>% 
+      select(school_id, rating_2013, status_2013), 
+    by = "school_id"
+  ) %>% 
+  left_join(
+    cps_14 %>% 
+      select(school_id, rating_2014, status_2014), 
+    by = "school_id"
+  ) %>% 
+  left_join(
+    cps_15 %>% 
+      select(school_id, rating_2015, status_2015), 
+    by = "school_id"
+  ) %>%
+  left_join(
+    cps_16 %>% 
+      select(school_id, rating_2016, status_2016), 
+    by = "school_id"
+  ) %>%
+  left_join(
+    cps_17 %>% 
+      select(school_id, rating_2017, status_2017, network), 
+    by = "school_id"
+  )
+
+prob_df <-
+  prob_df %>% 
+  gather(key = key, value = value, status_2011:status_2017) %>% 
+  separate(key, into = c("key", "year"), sep = "_", convert = TRUE) %>% 
+  spread(key = key, value = value) %>%
+  mutate(
+    rating =
+      if_else(
+        rating %in% c("Inability to Rate", "Not Enough Data"), 
+        NA_character_, 
+        rating
+      ),
+    rating = str_remove(rating, "\\+$"),
+    status = 
+      recode(
+        status,
+        "Not Applicable" = NA_character_,
+        "Good Standing" = "Not on Probation",
+        "Intensive Support" = "Probation",
+        "Provisional Support" = "Probation"
+      ),
+    network =
+      fct_relevel(
+        network,
+        "Network 1",
+        "Network 2",
+        "Network 3",
+        "Network 4",
+        "Network 5",
+        "Network 6",
+        "Network 7",
+        "Network 8",
+        "Network 9",
+        "Network 10",
+        "Network 11",
+        "Network 12",
+        "Network 13",
+        "AUSL",
+        "Charter",
+        "Contract"
+      )
+  )
+```
+
+```{r}
+prob_df %>% 
+  drop_na(status) %>% 
+  group_by(year) %>% 
+  summarise(prop_probation = sum(status == "Probation", na.rm = TRUE) / n()) %>% 
+  ggplot(aes(year, prop_probation)) +
+  geom_vline(aes(xintercept = 2014), linetype = "dashed", color = "grey50") +
+  geom_point() +
+  geom_line() +
+  annotate(
+    geom = "text",
+    x = 2014.1,
+    y = .45,
+    label = "Year Standards\nChanged",
+    hjust = 0
+  ) +
+  scale_x_continuous(breaks = seq(2011, 2017, 1)) +
+  scale_y_continuous(breaks = seq(.20, .40, .05)) +
+  theme_minimal() +
+  labs(
+    title = "Rate of Probation from 2011-2017",
+    x = NULL,
+    y = "Proportion of Schools on Probation",
+    caption = "Source: CPS"
+  )
+```
+
+We see that it appears as though there's been a significant and steady decrease in the proportion of schools on probation since 2011. However, let's see what happens if we account for the schools that have been closed in the period from 2011-2017. I was able to account for 66 elementary schools closing in that time, a few of which are shown below.
+
+```{r}
+closed <-
+  cps_11 %>% 
+  anti_join(cps_17, by = "school_id") %>% 
+  filter(!(school_id %in% UNCERTAIN_IDS))
+
+closed %>% 
+  transmute(
+    `School ID` = school_id,
+    `School Name` = name,
+    `Probation Status (2011)` = status_2011,
+    `Rating (2011)` = rating_2011
+  ) %>% 
+  head() %>% 
+  knitr::kable() 
+
+```
+
+When we remove them outright when calculating the proportion of schools on probation, we see the following:
+
+```{r}
+adj_prob_df <-
+  prob_df %>% 
+  anti_join(
+    closed,
+    by = "school_id"
+  ) %>% 
+  drop_na(status) %>% 
+  group_by(year) %>% 
+  summarise(prop_probation = sum(status == "Probation", na.rm = TRUE) / n())
+
+prob_df %>% 
+  drop_na(status) %>% 
+  group_by(year) %>% 
+  summarise(prop_probation = sum(status == "Probation", na.rm = TRUE) / n()) %>% 
+  ggplot(aes(year, prop_probation)) +
+  geom_vline(aes(xintercept = 2014), linetype = "dashed", color = "grey50") +
+  geom_point() +
+  geom_line() +
+  geom_line(data = adj_prob_df, color = "red") +
+  geom_point(data = adj_prob_df, color = "red") +
+  annotate(
+    geom = "text",
+    x = c(2011.2, 2011.2, 2014.1),
+    y = c(.36, .435,  .45),
+    label = c("Adjusted", "Unadjusted", "Year Standards\nChanged"),
+    hjust = c(0, 0, 0)
+  ) +
+  scale_x_continuous(breaks = seq(2011, 2017, 1)) +
+  scale_y_continuous(breaks = seq(.20, .40, .05)) +
+  theme_minimal() +
+  labs(
+    title = "Rate of Probation from 2011-2017",
+    subtitle = "Now accounting for school closures",
+    x = NULL,
+    y = "Proportion of Schools on Probation",
+    caption = "Source: CPS"
+  )
+  
+  
+```
+
+Now, we can see that the probation rate did not change quite as dramatically, although there is still a significant descrease. In fact, any decrease in the probation rate from 2012 to 2013 was entirely due to the schools closing - we see that the adjusted rate actually increased slightly in that time. Additionally, of the significant improvement still present, most of it occurred after 2014 - after the new standards were put into place. In those four academic years, the probation rate declined from 34.7% to 22.1%, indicating a third of the schools on probation in the 2014-15 school year were no longer so in the 2017-18 school year. 
+
+We'll investigate this finding later - first, let's take a quick detour and look more closely at those shuttered schools.
+
+### Closed Schools - Where Were They, and What Did They Look Like?
+
+Through some anti-joining and extra research, I was able to identify 66 schools that I could confirm had been shuttered or relocated at some point from 2011 through 2017. The majority are schools that were closed in the historic closures of 2013, but others were closed before or phased out slowly after 2013.
+
+Let's look at what kinds of students these schools served.
+
+```{r}
+df <-
+  closed %>% 
+  left_join(
+    df_race_11 %>% 
+      select(school_id, total_enroll, pct_white),
+    by = "school_id"
+  ) %>% 
+  left_join(
+    df_frl_11 %>% 
+      select(school_id, percent_frl),
+    by = "school_id"
+  ) %>% 
+  drop_na(pct_white, percent_frl)
+
+cps_11 %>% 
+  left_join(
+    df_race_11 %>% 
+      select(school_id, total_enroll, pct_white),
+    by = "school_id"
+  ) %>% 
+  left_join(
+    df_frl_11 %>% 
+      select(school_id, percent_frl),
+    by = "school_id"
+  ) %>% 
+  drop_na(pct_white, percent_frl) %>% 
+  anti_join(df, by = "school_id") %>% 
+  ggplot(aes(x = percent_frl, y = pct_white, size = total_enroll)) +
+  geom_point(alpha = 0.3, shape = 21, fill = "grey50") +
+  geom_point(
+    alpha = 0.3, 
+    shape = 21,
+    fill = "firebrick2", 
+    data = df
+  ) +
+  scale_size_continuous(range = c(1, 6)) +
+  coord_cartesian(xlim = c(0, 100), ylim = c(0, 100)) +
+  theme_light() +
+  theme(
+    legend.justification = c(0, 1)
+  ) +
+  labs(
+    title = "Distribution of Schools Across Race and Income",
+    subtitle = "Red points indicate closed schools",
+    x = "Percent on Free/Reduced Lunch",
+    y = "Percent White",
+    size = "Total\nEnrollment",
+    caption = "Source: CPS"
+  )
+
+```
+
+There's that bottom right corner again. The schools that were closed all served student populations that were overwhelmingly nonwhite and overwhelmingly qualified for free and reduced lunch - students that are vulnerable to begin with, and may be harmed additionally by school closings.
+
+Now let's see where they were geographically located, using the geographic network structure as of 2017 to provide some organization to the neighborhoods.
+
+```{r, warning=FALSE}
+school_locations <-
+  school_locations %>% 
+  mutate(school_id = as.integer(school_id)) %>% 
+  left_join(closed, .,  by = "school_id") 
+
+school_locations1 <-
+  school_locations %>% 
+  drop_na(network) %>% 
+  st_as_sf()
+
+
+networks %>% 
+  mutate(
+    network_num = fct_reorder(network_num, as.integer(network_num)),
+    lon = map_dbl(geometry, ~ st_centroid(.x)[[1]]),
+    lat = map_dbl(geometry, ~ st_centroid(.x)[[2]])
+  ) %>% 
+  ggplot() +
+  geom_sf(aes(fill = network_num), alpha = .75) +
+  geom_text(
+    aes(label = network_num, x = lon, y = lat), 
+    size = 4, 
+    color = "white",
+    fontface = 2
+  ) +
+  geom_sf(data = school_locations1) +
+  coord_sf(datum = NA) +
+  theme_void() +
+  theme(legend.position = "none") +
+  labs(caption = "Sources: CPS and City of Chicago")
+
+```
+
+We see that school closings were clustered in what are now the 5th, 9th, and 11th networks - neighborhoods in Chicago's South and West Side.
+
+* The 5th network includes the neighborhoods of Humboldt Park, West Garfield Park, and Lawndale.
+
+* The 9th network includes the neighborhoods of Bronzeville, Hyde Park, and Woodlawn.
+
+* The 11th network includes the neighborhoods of Englewood and Gresham.
+
+With the exception of Hyde Park (where UChicago is located), these are some of the poorest neighborhoods in Chicago. Englewood has a median income of about $22,000. You can see the median income of the other neighborhoods using https://richblockspoorblocks.com/, or explore the outcomes of children who grew up here with the [Opportunity Atlas](https://www.opportunityatlas.org/).
+
+### Attainment and Growth from 2014-2017
+
+As we saw earlier, there was a major decrease in the proportion of schools on probation from 2014 to 2017. Although there are other factors, such as attendance and community, that go into determining a school's probation status, academic achievement is a major component of CPS's evaluation. Therefore, with this decrease in probation, we might expect higher academic achievement in the district, especially in struggling schools. Let's see if this is true.
+
+First, let's see how the district has performed as whole, across schools and across school years. We'll be looking at both measures of attainment (how much the students know right now) and growth (how much the students learned). CPS administers the MAP test to all second to eight graders yearly, which is how these measures are derived. Attainment is taken from the students' raw MAP scores placed on a national scale, while growth is found through the administration of a pre- and post-test, of which the difference in scores is used to measure growth. 
+
+(Note: weighted means were taken throughout this part of the analysis, weighted by the number of students.)
+
+```{r}
+district_avg_attain <-
+  attain_df %>% 
+  filter(grade == "Grades 2-8 Combined", year != 2013) %>% 
+  mutate(
+    subject = str_to_title(subject),
+    subject = fct_relevel(subject, "Reading")
+  ) %>% 
+  group_by(subject) %>% 
+  summarise(
+    avg_pct_at_nat_avg = 
+      weighted.mean(pct_at_nat_avg, w = num_students, na.rm = TRUE)
+  )
+
+attain_df %>% 
+  filter(grade == "Grades 2-8 Combined", year != 2013) %>% 
+  mutate(
+    subject = str_to_title(subject),
+    subject = fct_relevel(subject, "Reading")
+  ) %>% 
+  group_by(school_id, subject) %>% 
+  summarise(
+    avg_pct_at_nat_avg = 
+      weighted.mean(pct_at_nat_avg, w = num_students, na.rm = TRUE)
+  ) %>% 
+  ungroup() %>% 
+  drop_na(avg_pct_at_nat_avg) %>% 
+  ggplot(aes(avg_pct_at_nat_avg, color = subject, fill = subject)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(
+    aes(xintercept = avg_pct_at_nat_avg, color = subject),
+    size = 1,
+    data = district_avg_attain
+  ) +
+  annotate(
+    geom = "text",
+    x = 60,
+    y = Inf,
+    hjust = -.1,
+    vjust = 2,
+    label = "District Average"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 100, 20),
+    labels = function(x) str_c(x, "%")
+  ) +
+  guides(
+    color = FALSE
+  ) +
+  theme_light() +
+  labs(
+    title = "Mean Percent of Students Meeting/Exceeding National Average in Attainment",
+    subtitle = "Across School Years 2014-2015 to 2017-2018",
+    x = "Percent At/Above National Average",
+    y = "Density",
+    fill = "Subject",
+    caption = "Source: CPS"
+  )
+```
+
+Overall, we see that close to 60% of students are meeting or exceeding the national average in attainment for reading, and 55% for math. However, there's quite a spread in values - with some schools at 0% (for math) and others at 100%. Now let's look at district-wide attainment from 2014-2017.
+
+```{r}
+attain_df %>% 
+  filter(grade == "Grades 2-8 Combined", year != 2013) %>% 
+  mutate(
+    subject = str_to_title(subject),
+    subject = fct_relevel(subject, "Reading")
+  ) %>% 
+  group_by(subject, year) %>% 
+  summarise(
+    avg_pct_at_nat_avg = 
+      weighted.mean(pct_at_nat_avg, w = num_students, na.rm = TRUE)
+  ) %>% 
+  ggplot(aes(x = year, y = avg_pct_at_nat_avg, color = subject)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(minor_breaks = NULL) +
+  scale_y_continuous(
+    breaks = seq(50, 65, 2),
+    labels = function(x) str_c(x, "%"),
+    minor_breaks = NULL
+  ) +
+  theme_light() +
+  labs(
+    title = "Mean Percent Meeting National Average from 2014-2017",
+    subtitle = "Attainment (measured by Raw MAP scores)",
+    x = "Year",
+    y = "Percent At/Above National Average",
+    caption = "Source: CPS",
+    color = "Subject"
+  ) 
+```
+
+We see steady improvement in attainment for both math and reading in this time period, although the rise in reading scores has stalled recently. At first glance, the district does seem to be experiencing improving academic achievement. Now let's look at students' growth, which is an important reflection of how much the students are learning in a school year. 
+
+```{r}
+district_avg_growth <-
+  growth_df %>% 
+  filter(grade == "Grades 3-8 Combined", year != 2013) %>% 
+  mutate(
+    subject = str_to_title(subject),
+    subject = fct_relevel(subject, "Reading")
+  ) %>% 
+  group_by(subject) %>% 
+  summarise(
+    avg_pct_at_nat_avg = 
+      weighted.mean(pct_at_nat_avg, w = num_tested, na.rm = TRUE)
+  )
+
+growth_df %>% 
+  filter(grade == "Grades 3-8 Combined", year != 2013) %>% 
+  mutate(
+    subject = str_to_title(subject),
+    subject = fct_relevel(subject, "Reading")
+  ) %>% 
+  group_by(school_id, subject) %>% 
+  summarise(
+    avg_pct_at_nat_avg = 
+      weighted.mean(pct_at_nat_avg, w = num_tested, na.rm = TRUE)
+  ) %>% 
+  ungroup() %>% 
+  drop_na(avg_pct_at_nat_avg) %>% 
+  ggplot(aes(avg_pct_at_nat_avg, color = subject, fill = subject)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(
+    aes(xintercept = avg_pct_at_nat_avg, color = subject),
+    size = 1,
+    data = district_avg_growth
+  ) +
+  annotate(
+    geom = "text",
+    x = 60,
+    y = Inf,
+    hjust = -.1,
+    vjust = 2,
+    size = 3,
+    label = "District Average"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 100, 10),
+    labels = function(x) str_c(x, "%")
+  ) +
+  guides(
+    color = FALSE
+  ) +
+  theme_light() +
+  labs(
+    title = "Mean Percent of Students Meeting/Exceeding National Average in Growth",
+    subtitle = "Across School Years 2014-2015 to 2017-2018",
+    x = "Percent At/Above National Average",
+    y = "Density",
+    fill = "Subject",
+    caption = "Source: CPS"
+  )
+```
+
+Here, we see that district-wide, the average percent of students meeting or exceeding the national average in growth is close to 60% for reading, and 56% for math. However, especially for math, there is a large range between schools.
+
+```{r}
+growth_df %>% 
+  filter(grade == "Grades 3-8 Combined", year != 2013) %>% 
+  mutate(
+    subject = str_to_title(subject),
+    subject = fct_relevel(subject, "Reading")
+    ) %>% 
+  group_by(subject, year) %>% 
+  summarise(
+    avg_pct_at_nat_avg = 
+      weighted.mean(pct_at_nat_avg, w = num_tested, na.rm = TRUE)
+  ) %>% 
+  ggplot(aes(x = year, y = avg_pct_at_nat_avg, color = subject)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(minor_breaks = NULL) +
+  scale_y_continuous(
+    breaks = seq(50, 65, 2),
+    labels = function(x) str_c(x, "%"),
+    minor_breaks = NULL
+  ) +
+  theme_light() +
+  labs(
+    title = "Mean Percent Meeting National Average from 2014-2017",
+    subtitle = "Growth (measured by difference in pre- and post-test MAP Scores)",
+    x = "Year",
+    y = "Percent At/Above National Average",
+    caption = "Source: CPS",
+    color = "Subject"
+  ) 
+```
+
+Over time, we see that growth in math has experienced a slow, but steady rise. For reading, there appears to be a sharp increase between 2014 and 2015, and a steady decrease since. I haven't been able to determine what caused that peak yet.
+
+Although the district appears to be doing well overall, let's see how individual schools are performing with respect to attainment and growth. Remember, we saw a sharp decrease in schools on probation, meaning poorly-performing schools should be getting better.
+
+(Methodological note: the following maps show the boundaries of about 350 elementary schools, meaning that the approximately 100 middle schools that were present in the above analysis are not represented here. However, I have found that the patterns of attainment and growth are very similar in just elementary schools as they were in elementary and middle schools.)
+
+```{r, fig.width=8, fig.height=8}
+elem_boundaries_17 %>% 
+  mutate(school_id = as.integer(school_id)) %>% 
+  left_join(
+    attain_df %>% 
+      filter(grade == "Grades 2-8 Combined"),
+    by = "school_id"
+  ) %>% 
+  filter(year != 2013) %>% 
+  ggplot() +
+  geom_sf(aes(fill = pct_at_nat_avg), color = NYT_NA_COLOR, size = .1) +
+  geom_sf(fill = NA, color = "white", size = .5, data = networks) +
+  scale_fill_gradient2(
+    breaks = seq(15, 90, 15),
+    midpoint = 50,
+    na.value = NYT_NA_COLOR
+  ) +
+  coord_sf(datum = NA) +
+  guides(
+    fill = 
+      guide_colorbar(
+        title = "Percent of Students\nMeeting National Average",
+        barwidth = 6,
+        barheight = 0.25,
+        nbin = 5,
+        ticks = FALSE,
+        direction = "horizontal"
+      )
+  ) +
+  facet_grid(cols = vars(subject)) +
+  theme_void() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 6)
+  ) +
+  transition_manual(frames = year) + 
+  labs(
+    title = "Attainment (Measured by Raw MAP Scores)",
+    subtitle = "School Year: {current_frame} - {next_frame}"
+  )
+```
+
+In the maps above, we can see that there are distinct divides in attainment across neighborhoods, especially in math. Neighborhoods on the North side have upwards of 70, 80, 90% of their students meeting the national average year to year. In the South and West sides, that percentage is more like 30 or 40%. 
+
+While we can see that overall attainment seems to have improved since 2014, that improvement is mostly present in schools that were already doing relatively well. Many of the schools that were low-achieving in 2014 have stayed persistently so, especially in the networks we identified earlier as being those hit by school closings.
+
+Now we'll look at growth across the city. CPS has recently been celebrated for its high academic growth, as published by CEPA: https://cepa.stanford.edu/news/new-analysis-leading-education-expert-cps-students-are-learning-and-growing-faster-96-students-united-states. However, CEPA's research looked at the district as a whole. Let's look at how growth varies across individual schools now.
+
+```{r, fig.width=8, fig.height=8}
+elem_boundaries_17 %>% 
+  mutate(school_id = as.integer(school_id)) %>% 
+  left_join(
+    growth_df %>% 
+      filter(grade == "Grades 3-8 Combined"),
+    by = "school_id"
+  ) %>% 
+  filter(year != 2013) %>% 
+  ggplot() +
+  geom_sf(aes(fill = pct_at_nat_avg), color = NYT_NA_COLOR, size = .1) +
+  geom_sf(fill = NA, color = "white", size = .5, data = networks) +
+  scale_fill_gradient2(
+    breaks = seq(30, 90, 15),
+    midpoint = 50,
+    na.value = NYT_NA_COLOR
+  ) +
+  coord_sf(datum = NA) +
+  guides(
+    fill = 
+      guide_colorbar(
+        title = "Percent of Students\nMeeting National Average",
+        barwidth = 6,
+        barheight = 0.25,
+        nbin = 5,
+        ticks = FALSE,
+        direction = "horizontal"
+      )
+  ) +
+  facet_grid(cols = vars(subject)) +
+  theme_void() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 6)
+  ) +
+  transition_manual(frames = year) + 
+  labs(
+    title = "Growth (Measured by Posttest/Pretest MAP Scores)",
+    subtitle = "School Year: {current_frame} - {next_frame}"
+  )
+```
+
+We can see that there is not nearly as much disparity in growth across neighborhoods as we saw with attainment. Especially in reading, most of the schools across the cities have 60-70% of their students meeting the national average in growth. Yet, in math, we see that the schools that are lagging behind are once again concentrated in the South and West side.
+
+Once again, we see that growth for reading has been dipping in recent years, indicating that CEPA's finding about CPS (which was uncovered using NAEP scores from 2009 to 2014) may no longer be true, or may cease being true soon in the future.
+
+### Conclusions
+
+Chicago Public Schools have undergone a rocky few years recently. As Rahm Emanuel leaves office and embarks on his national "I did a job well-done" tour, he will (and already has) use CPS as an example of his leadership and reform ability. However, as we have shown, the truth is a little more complicated. 
+
+For one, Chicago schools serve almost exclusively low-income minority kids, meaning high-income white children likely go exclusively to private schools. Regardless, the children who do attend CPS are still racially segregated. A white student attending a CPS school likely attends a school in Networks 1, 2, or 4, which are also the highest-performing schools. Issues of race, class, and educational opportunity are compounded in Chicago, perpetuating a deep and persistent inequality.
+
+We see this clearly through our investigations of the school closings of 2013 and our mappings of attainment and growth across CPS schools. Emanuel's 2013 closures, which were supposedly motivated by underenrollment, targeted schools almost exclusively in the same neighborhoods on the South and West side. These schools served vulnerable students, and the disruption of the closings actively harmed their academic outcomes, according to a recent report by the [UChicago Consortium](https://consortium.uchicago.edu/sites/default/files/publications/School%20Closings%20in%20Chicago-May2018-Consortium.pdf).
+
+Furthermore, the high growth rates reported by CEPA and touted by Emanuel are undercut by the enduring inequality seen in students' actual attainment level. We see that academic improvement has not reached many schools in the South and West side, despite higher-achieving schools in the North side making strides. Additionally, growth measured by MAP scores, the primary indicator the district uses, have actually been decreasing significantly in reading, a possible sign that recent policies have not done their part to upkeep the growth seen by CEPA from 2009-2014.
+
